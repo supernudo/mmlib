@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <unistd.h>
+//#include <unistd.h>
 
 #define MAZE_SIZE 16
 #define MAZE_AREA (16 * 16)

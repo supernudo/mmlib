@@ -1,10 +1,11 @@
 #ifndef __WALLS_H
 #define __WALLS_H
 
-#include "mmlib/clock.h"
-#include "mmlib/search.h"
 
-#include "detection.h"
+#include "main.h"
+#include "sensor.h"
+#include "strat.h"
+#include "search.h"
 
 void update_distance_readings(void);
 float get_side_left_distance(void);

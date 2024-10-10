@@ -1,18 +1,33 @@
+
 #include "walls.h"
 
+
+/** Calibration constants for sensors */
+#define SENSOR_SIDE_LEFT_A 2.806
+#define SENSOR_SIDE_LEFT_B 0.287
+#define SENSOR_SIDE_RIGHT_A 2.327
+#define SENSOR_SIDE_RIGHT_B 0.231
+#define SENSOR_FRONT_LEFT_A 2.609
+#define SENSOR_FRONT_LEFT_B 0.242
+#define SENSOR_FRONT_RIGHT_A 2.713
+#define SENSOR_FRONT_RIGHT_B 0.258
+
+static volatile float distance[SENSORS_WALL_MAX];
+static volatile float calibration_factor[SENSORS_WALL_MAX];
+
+/* XXX: Keep sync with sensor.h */
+const float sensors_calibration_a[SENSORS_WALL_MAX] = {
+	SENSOR_FRONT_LEFT_A, SENSOR_FRONT_RIGHT_A,
+    SENSOR_SIDE_LEFT_A, SENSOR_SIDE_RIGHT_A};
+const float sensors_calibration_b[SENSORS_WALL_MAX] = {
+	SENSOR_FRONT_LEFT_B, SENSOR_FRONT_RIGHT_B,
+    SENSOR_SIDE_LEFT_B, SENSOR_SIDE_RIGHT_B};
+
+/* Distance thresholds */
 #define SIDE_WALL_DETECTION (CELL_DIMENSION * 0.90)
 #define FRONT_WALL_DETECTION (CELL_DIMENSION * 1.5)
 #define SIDE_CALIBRATION_READINGS 20
 #define DIAGONAL_MIN_DISTANCE 0.24
-
-static volatile float distance[NUM_SENSOR];
-static volatile float calibration_factor[NUM_SENSOR];
-const float sensors_calibration_a[NUM_SENSOR] = {
-    SENSOR_SIDE_LEFT_A, SENSOR_SIDE_RIGHT_A, SENSOR_FRONT_LEFT_A,
-    SENSOR_FRONT_RIGHT_A};
-const float sensors_calibration_b[NUM_SENSOR] = {
-    SENSOR_SIDE_LEFT_B, SENSOR_SIDE_RIGHT_B, SENSOR_FRONT_LEFT_B,
-    SENSOR_FRONT_RIGHT_B};
 
 /**
  * @brief Calculate and update the distance from each sensor.
@@ -22,15 +37,15 @@ const float sensors_calibration_b[NUM_SENSOR] = {
 void update_distance_readings(void)
 {
 	uint8_t i = 0;
-	uint16_t on[NUM_SENSOR], off[NUM_SENSOR];
+	uint16_t on[SENSORS_WALL_MAX], off[SENSORS_WALL_MAX];
 
-	get_sensors_raw(on, off);
-
-	for (i = 0; i < NUM_SENSOR; i++) {
+	for (i = 0; i < SENSORS_WALL_MAX; i++) {
+		on[i] = sensor_adc_get_value_on(i);
+		off[i] = sensor_adc_get_value_off(i);
 		distance[i] =
-		    (sensors_calibration_a[i] / sensors_raw_log(on[i], off[i]) -
+		    (sensors_calibration_a[i] / sensor_raw_log(on[i], off[i]) -
 		     sensors_calibration_b[i]);
-		if ((i == SENSOR_SIDE_LEFT_ID) || (i == SENSOR_SIDE_RIGHT_ID))
+		if ((i == SENSOR_SIDE_LEFT) || (i == SENSOR_SIDE_RIGHT))
 			distance[i] -= calibration_factor[i];
 	}
 }
@@ -40,7 +55,7 @@ void update_distance_readings(void)
  */
 float get_front_left_distance(void)
 {
-	return distance[SENSOR_FRONT_LEFT_ID];
+	return distance[SENSOR_FRONT_LEFT];
 }
 
 /**
@@ -48,7 +63,7 @@ float get_front_left_distance(void)
  */
 float get_front_right_distance(void)
 {
-	return distance[SENSOR_FRONT_RIGHT_ID];
+	return distance[SENSOR_FRONT_RIGHT];
 }
 
 /**
@@ -56,7 +71,7 @@ float get_front_right_distance(void)
  */
 float get_side_left_distance(void)
 {
-	return distance[SENSOR_SIDE_LEFT_ID];
+	return distance[SENSOR_SIDE_LEFT];
 }
 
 /**
@@ -64,7 +79,7 @@ float get_side_left_distance(void)
  */
 float get_side_right_distance(void)
 {
-	return distance[SENSOR_SIDE_RIGHT_ID];
+	return distance[SENSOR_SIDE_RIGHT];
 }
 
 /**
@@ -79,8 +94,8 @@ float get_side_sensors_close_error(void)
 	float left_error;
 	float right_error;
 
-	left_error = distance[SENSOR_SIDE_LEFT_ID] - MIDDLE_MAZE_DISTANCE;
-	right_error = distance[SENSOR_SIDE_RIGHT_ID] - MIDDLE_MAZE_DISTANCE;
+	left_error = distance[SENSOR_SIDE_LEFT] - MIDDLE_MAZE_DISTANCE;
+	right_error = distance[SENSOR_SIDE_RIGHT] - MIDDLE_MAZE_DISTANCE;
 
 	if ((left_error > 0.) && (right_error < 0.))
 		return right_error;
@@ -100,8 +115,8 @@ float get_side_sensors_far_error(void)
 	float left_error;
 	float right_error;
 
-	left_error = distance[SENSOR_SIDE_LEFT_ID] - MIDDLE_MAZE_DISTANCE;
-	right_error = distance[SENSOR_SIDE_RIGHT_ID] - MIDDLE_MAZE_DISTANCE;
+	left_error = distance[SENSOR_SIDE_LEFT] - MIDDLE_MAZE_DISTANCE;
+	right_error = distance[SENSOR_SIDE_RIGHT] - MIDDLE_MAZE_DISTANCE;
 
 	if ((left_error > 0.1) && (right_error < 0.04))
 		return right_error;
@@ -122,7 +137,7 @@ float get_front_sensors_error(void)
 {
 	if (!front_wall_detection())
 		return 0.;
-	return distance[SENSOR_FRONT_LEFT_ID] - distance[SENSOR_FRONT_RIGHT_ID];
+	return distance[SENSOR_FRONT_LEFT] - distance[SENSOR_FRONT_RIGHT];
 }
 
 /**
@@ -137,8 +152,8 @@ float get_diagonal_sensors_error(void)
 	float left_error;
 	float right_error;
 
-	left_error = distance[SENSOR_FRONT_LEFT_ID] - DIAGONAL_MIN_DISTANCE;
-	right_error = distance[SENSOR_FRONT_RIGHT_ID] - DIAGONAL_MIN_DISTANCE;
+	left_error = distance[SENSOR_FRONT_LEFT] - DIAGONAL_MIN_DISTANCE;
+	right_error = distance[SENSOR_FRONT_RIGHT] - DIAGONAL_MIN_DISTANCE;
 
 	if (right_error < 0.)
 		return right_error;
@@ -152,8 +167,8 @@ float get_diagonal_sensors_error(void)
  */
 float get_front_wall_distance(void)
 {
-	return (distance[SENSOR_FRONT_LEFT_ID] +
-		distance[SENSOR_FRONT_RIGHT_ID]) /
+	return (distance[SENSOR_FRONT_LEFT] +
+		distance[SENSOR_FRONT_RIGHT]) /
 	       2.;
 }
 
@@ -162,7 +177,7 @@ float get_front_wall_distance(void)
  */
 bool left_wall_detection(void)
 {
-	return (distance[SENSOR_SIDE_LEFT_ID] < SIDE_WALL_DETECTION) ? true
+	return (distance[SENSOR_SIDE_LEFT] < SIDE_WALL_DETECTION) ? true
 								     : false;
 }
 
@@ -171,7 +186,7 @@ bool left_wall_detection(void)
  */
 bool right_wall_detection(void)
 {
-	return (distance[SENSOR_SIDE_RIGHT_ID] < SIDE_WALL_DETECTION) ? true
+	return (distance[SENSOR_SIDE_RIGHT] < SIDE_WALL_DETECTION) ? true
 								      : false;
 }
 
@@ -180,8 +195,8 @@ bool right_wall_detection(void)
  */
 bool front_wall_detection(void)
 {
-	return ((distance[SENSOR_FRONT_LEFT_ID] < FRONT_WALL_DETECTION) &&
-		(distance[SENSOR_FRONT_RIGHT_ID] < FRONT_WALL_DETECTION))
+	return ((distance[SENSOR_FRONT_LEFT] < FRONT_WALL_DETECTION) &&
+		(distance[SENSOR_FRONT_RIGHT] < FRONT_WALL_DETECTION))
 		   ? true
 		   : false;
 }
@@ -209,12 +224,12 @@ void side_sensors_calibration(void)
 	int i;
 
 	for (i = 0; i < SIDE_CALIBRATION_READINGS; i++) {
-		left_temp += distance[SENSOR_SIDE_LEFT_ID];
-		right_temp += distance[SENSOR_SIDE_RIGHT_ID];
-		sleep_ticks(SENSORS_SM_TICKS);
+		left_temp += distance[SENSOR_SIDE_LEFT];
+		right_temp += distance[SENSOR_SIDE_RIGHT];
+		time_wait_ms(SENSORS_PERIOD_us);
 	}
-	calibration_factor[SENSOR_SIDE_LEFT_ID] +=
+	calibration_factor[SENSOR_SIDE_LEFT] +=
 	    (left_temp / SIDE_CALIBRATION_READINGS) - MIDDLE_MAZE_DISTANCE;
-	calibration_factor[SENSOR_SIDE_RIGHT_ID] +=
+	calibration_factor[SENSOR_SIDE_RIGHT] +=
 	    (right_temp / SIDE_CALIBRATION_READINGS) - MIDDLE_MAZE_DISTANCE;
 }
