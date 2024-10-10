@@ -7,10 +7,12 @@
 #define SENSOR_SIDE_LEFT_B 0.287
 #define SENSOR_SIDE_RIGHT_A 2.327
 #define SENSOR_SIDE_RIGHT_B 0.231
-#define SENSOR_FRONT_LEFT_A 2.609
-#define SENSOR_FRONT_LEFT_B 0.242
-#define SENSOR_FRONT_RIGHT_A 2.713
-#define SENSOR_FRONT_RIGHT_B 0.258
+
+
+#define SENSOR_FRONT_LEFT_A 1500.462
+#define SENSOR_FRONT_LEFT_B 138.777
+#define SENSOR_FRONT_RIGHT_A 1378.603
+#define SENSOR_FRONT_RIGHT_B 124.503
 
 static volatile float distance[SENSORS_WALL_MAX];
 static volatile float calibration_factor[SENSORS_WALL_MAX];
